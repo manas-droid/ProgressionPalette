@@ -345,6 +345,31 @@ def update_weights_file(path: Path) -> None:
         json.dump(records, handle, indent=2)
 
 
+def build_progression_pattern_summary(records: list[dict]) -> list[dict]:
+    counts: dict[tuple[str, str, tuple[str, ...]], int] = {}
+    functions_by_key: dict[tuple[str, str, tuple[str, ...]], list[str]] = {}
+    for item in records:
+        roman_seq = tuple(item.get("roman_sequence", []))
+        function_seq = item.get("function_sequence", [])
+        mode = item.get("mode", "")
+        key = (mode, roman_seq, tuple(function_seq))
+        counts[key] = counts.get(key, 0) + 1
+        if key not in functions_by_key:
+            functions_by_key[key] = function_seq
+
+    max_count = max(counts.values()) if counts else 1
+    summary: list[dict] = []
+    for (mode, roman_seq, function_seq), count in counts.items():
+        summary.append({
+            "roman_sequence": list(roman_seq),
+            "mode": mode,
+            "function_sequence": list(function_seq),
+            "count": count,
+            "base_weight": round(count / max_count, 2),
+        })
+    return summary
+
+
 def main() -> None:
     root = Path.cwd()
 
@@ -356,9 +381,15 @@ def main() -> None:
     with emotion_scores_path.open("w", encoding="utf-8") as handle:
         json.dump(emotion_scores, handle, indent=2)
 
+    pattern_summary = build_progression_pattern_summary(emotion_scores)
+    pattern_summary_path = root / "progression_pattern_summary.json"
+    with pattern_summary_path.open("w", encoding="utf-8") as handle:
+        json.dump(pattern_summary, handle, indent=2)
+
     print(
         "Wrote "
-        f"{len(emotion_scores)} scored progressions to {emotion_scores_path}"
+        f"{len(emotion_scores)} scored progressions to {emotion_scores_path}, "
+        f"{len(pattern_summary)} progression patterns to {pattern_summary_path}"
     )
 
 
