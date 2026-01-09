@@ -1,146 +1,267 @@
-# AI-Assisted Chord Progression Generation from Emotional Prompts
+# AI-Assisted Chord Progression Generation (v1)
+
+## Version
+
+**v1.0 - Harmonic Core (Frozen)**
+
+This document defines the **final, frozen scope of Version 1** of the project.
+All future work must build **on top of v1** without modifying its assumptions, data, or logic.
+
+---
 
 ## Project Overview
 
-This project explores the intersection of **artificial intelligence and music theory** by building a system that generates **harmonically valid chord progressions** from **natural-language emotional prompts**.
+This project explores the intersection of **AI and music theory** by generating **harmonically valid chord progressions** from **high-level emotional intent**.
 
-Rather than composing full songs, melodies, or audio, the system focuses on a narrowly defined but musically meaningful task:
+Rather than composing full songs, melodies, or audio productions, the system focuses on a **narrow but musically meaningful task**:
 
-> Translating abstract human emotional intent (e.g., *“sad”*, *“soothing”*, *“hopeful”*) into short, structured harmonic ideas.
+> Translating abstract emotional intent into short, structured harmonic ideas grounded in real musical data.
 
-The project is designed as an **assistive creativity tool** that complements human musicianship rather than replacing it.
-
----
-
-## Problem Statement (Locked)
-
-Musicians often think in high-level emotional or situational terms, while music theory operates on structured harmonic rules. Translating vague emotional intent into concrete, musically valid chord progressions typically requires theoretical knowledge and experimentation.
-
-**The problem addressed by this project is:**
-
-> Given a natural-language emotional or situational prompt, generate a **harmonically coherent four-bar chord progression** that is compatible with the requested emotion, while respecting basic principles of tonal harmony.
-
-The system must be capable of generating **multiple distinct but valid progressions** for the same prompt, reflecting the non-uniqueness of musical interpretation.
+The system is designed as an **assistive creativity tool**, not an autonomous composer.
 
 ---
 
-## System Scope
+## Problem Statement (v1)
 
-### What the System Does
+Given a simple emotional prompt (e.g., *“soothing”*, *“sad”*, *“tense”*), generate a **harmonically coherent 4-bar chord progression** that:
 
-* Accepts **natural-language emotional prompts** (e.g., *“soothing”*, *“sad”*, *“reflective”*)
-* Generates a **4-bar chord progression**
+* Is musically valid within tonal harmony
+* Reflects the requested emotional intent
+* Is drawn from real musical practice
+* Produces **different valid outputs** for the same prompt across runs
 
-  * Exactly **one chord per bar**
-  * All chords belong to a **single tonal context**
-* Produces **multiple valid outputs** for the same prompt via controlled sampling
-* Ensures **harmonic validity** using music-theory constraints
-* Plays the generated chords for **demonstration and verification purposes**
-
----
-
-### What the System Does NOT Do
-
-This project intentionally does **not** attempt to:
-
-* Generate melodies
-* Generate lyrics
-* Perform audio synthesis or production
-* Model rhythm, tempo, or groove
-* Generate full song structures (verse/chorus/bridge)
-* Infer or model song-level emotional arcs
-* Claim emotional correctness or listener perception accuracy
-* Learn emotion labels from large audio or lyric datasets
-
-These exclusions are **deliberate design choices**, not limitations.
+The system explicitly models **local harmonic intent**, not full song-level emotional narratives.
 
 ---
 
 ## Core Design Principles
 
-### 1. Local Harmonic Intent, Not Full Composition
+### 1. Symbolic, Theory-Driven Generation
 
-The system models **local harmonic plausibility**, not complete musical narratives.
+All generation is performed using **symbolic representations**:
 
-A “sad” chord progression is defined as:
-
-* Harmonically compatible with sadness
-* Commonly used in sad musical contexts
-* Not emotionally contradictory
-
-It does **not** imply that:
-
-* Every progression in a sad song must be sad
-* Emotional interpretation is universal or objective
-
----
-
-### 2. Symbolic, Theory-Driven Representation
-
-The system operates entirely on **symbolic music representations**:
-
-* Chord symbols
 * Roman numerals
-* Harmonic functions (tonic, predominant, dominant)
+* Harmonic functions (Tonic / Predominant / Dominant)
+* Keys and modes (major / minor)
 
-Audio playback exists only to demonstrate that generated progressions are **musically meaningful and playable**.
-
----
-
-### 3. Controlled Diversity, Not Randomness
-
-The same emotional prompt should yield **different outputs across runs**, but all outputs must remain:
-
-* Harmonically valid
-* Emotionally compatible
-* Consistent with the system’s constraints
-
-This diversity is achieved through **probabilistic sampling within a constrained harmonic space**, not unconstrained randomness.
+No audio, melody, rhythm, or production features are used for decision-making.
 
 ---
 
-### 4. Explicit Abstraction Boundaries
+### 2. Data-Grounded Harmony
 
-The project intentionally avoids:
+Chord progressions are derived from a **real musical corpus** (MusicXML lead-sheet style data), not invented arbitrarily.
 
-* Automatic modulation detection
-* Secondary dominant inference
-* Chord extension modeling at the structural level
+Harmonic structure is treated as:
 
-These phenomena are musically important but are outside the scope of the current abstraction, which prioritizes **clarity, explainability, and correctness**.
+* finite
+* enumerable
+* statistically describable
+
+---
+
+### 3. Emotion as Compatibility, Not Truth
+
+Emotions are modeled as **compatibility biases** over harmonic structure, not as objective or universal labels.
+
+The system does **not** claim:
+
+* emotional correctness
+* listener perception accuracy
+* psychological grounding
+
+---
+
+### 4. Controlled Diversity
+
+The system produces variation through **probabilistic sampling**, not deterministic selection.
+
+Higher-probability patterns appear more often, but lower-probability patterns remain possible.
+
+---
+
+## Dataset (v1)
+
+### Source
+
+* 205 MusicXML songs
+* Lead-sheet-style harmony
+* Global key and mode per song
+
+### Extraction Rules
+
+* 4 bars per progression
+* Exactly 1 chord per bar
+* Global key and mode inherited from song
+* Only **diatonic** chords considered
+* If a bar contains multiple chords, the **first diatonic chord** is selected
+* Chord extensions, suspensions, and added tones are stripped
+* Only basic triads (major, minor, diminished) are retained
+* Non-diatonic bars invalidate the 4-bar window
+
+### Dataset Size
+
+* 1056 extracted progressions (non-unique)
+* Deduplicated into a **progression pattern catalog**
+* Each pattern assigned a frequency-derived base weight
+
+---
+
+## Data Representation
+
+### Progression Pattern (Conceptual)
+
+* Roman numeral sequence (length = 4)
+* Harmonic function sequence
+* Mode (major / minor)
+* Empirical base weight
+* Emotion compatibility scores
+* Source provenance (song + measure index)
+
+### Key Profile
+
+* Tonic
+* Mode
+* Sampling weight (bias toward common keys)
+
+---
+
+## Emotion Modeling (v1)
+
+### Emotion Space (Fixed)
+
+* suspenseful_tense
+* calm_meditative
+* wistful_longing
+* motivational_triumphant
+* nostalgic_sentimental
+* dark_brooding
+* happy_uplifting
+
+### Emotion Scores
+
+Each progression pattern is assigned **heuristic compatibility scores** based on:
+
+* tonic / predominant / dominant balance
+* cadence strength
+* mode
+* diminished harmony presence
+
+These scores are **precomputed** and stored with the dataset.
+
+---
+
+## Prompt Handling (v1)
+
+User input is mapped to emotion biases using **predefined prompt presets**.
+
+Example:
+
+```
+"soothing" : calm_meditative , nostalgic_sentimental
+```
+
+This layer is intentionally simple and exists to validate the core generation pipeline.
+It is designed to be replaced by more flexible natural-language interpretation in future versions.
+
+---
+
+## Generation Pipeline (v1)
+
+1. **Prompt -> Emotion Bias Vector**
+2. **Pattern Filtering** (by mode)
+3. **Effective Weight Computation**
+
+   ```
+   effective_weight =
+       base_weight
+     × emotion_compatibility
+     × motion_penalty
+   ```
+4. **Weighted Sampling** of one progression pattern
+5. **Key Sampling** from key profile
+6. **Roman → Chord Realization**
+7. **Playback as Block-Chord MIDI**
 
 ---
 
 ## Output Specification
 
-Each generated result includes:
+### Symbolic Output
 
-* A **key and mode** (major or minor)
-* A **4-bar chord progression**
+* Selected key
+* 4-bar chord progression
 * One chord per bar
-* Chords expressed as **basic triads** (major, minor, diminished)
 
-Example output format:
+Example:
 
 ```
-Key: C Major
-Bars:
-1. C
-2. Am
-3. F
-4. G
+Key: C minor
+Progression:
+1 | Cm
+2 | Cm
+3 | Fm
+4 | Cm
 ```
+
+### Audio Output
+
+* MIDI file
+* Fixed tempo
+* Piano instrument
+* Block triads (no inversions, no rhythm modeling)
+
+Audio playback is for **demonstration only**.
 
 ---
 
-## Project Philosophy
+## What v1 Explicitly Does NOT Do
 
-This project prioritizes:
+* No melody generation
+* No rhythm or groove modeling
+* No modulation detection
+* No chord extensions in structure
+* No neural harmony generation
+* No emotional classification of audio
+* No song-level form modeling
 
-* **Interpretability over black-box learning**
-* **Musical correctness over expressive excess**
-* **Depth over breadth**
-* **Clear abstractions over maximal realism**
+These are **intentional exclusions**, not limitations.
 
-The system is designed to be **small enough to understand** and **rigorous enough to defend**.
 ---
+
+## Status: Version Frozen
+
+Version 1 is **complete and frozen**.
+
+* Dataset locked
+* Extraction rules locked
+* Generation logic locked
+* Playback scope locked
+
+All future work must be implemented as **additive extensions** that do not modify v1 behavior.
+
+---
+
+## Looking Ahead
+
+Future versions may introduce:
+
+* Natural language prompt interpretation
+* Harmonic decoration at playback time
+* Explainability (“why this progression?”)
+* Multi-section progression chaining
+
+These extensions will preserve the **v1 harmonic core**.
+
+---
+
+## Final Note
+
+Version 1 demonstrates that **emotion-conditioned harmonic generation** can be achieved through:
+
+* careful abstraction
+* music-theory grounding
+* real musical data
+* probabilistic reasoning
+
+without relying on black-box generative models.

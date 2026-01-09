@@ -1,7 +1,7 @@
 
 from pathlib import Path
 import json
-from music21 import converter, key as m21key, stream, pitch as m21pitch, note as m21note, chord as m21chord
+from music21 import converter, key as m21key, stream, chord as m21chord
 
 
 
@@ -47,39 +47,46 @@ def build_diatonic_triads(k: m21key.Key) -> dict[int, set[int]]:
     return triads
 
 
-def collect_measure_pitches(score: stream.Score) -> dict[int, list[m21pitch.Pitch]]:
-    measures: dict[int, list[m21pitch.Pitch]] = {}
-    for part in score.parts:
-        for meas in part.getElementsByClass(stream.Measure):
-            num = meas.number
-            if num is None:
-                continue
-            measures.setdefault(num, [])
-            for element in meas.recurse():
-                if isinstance(element, m21note.Note):
-                    measures[num].append(element.pitch)
-                elif isinstance(element, m21chord.Chord):
-                    measures[num].extend(element.pitches)
-    return measures
+def build_scale_pitch_classes(k: m21key.Key) -> set[int]:
+    scale = k.getScale()
+    return {scale.pitchFromDegree(degree).pitchClass for degree in range(1, 8)}
 
 
-def measure_to_degree(
-    pitches: list[m21pitch.Pitch],
+def chord_to_degree(
+    chord: m21chord.Chord,
     triads: dict[int, set[int]],
+    scale_pcs: set[int],
 ) -> int | None:
-    if not pitches:
+    chord_pcs = {p.pitchClass for p in chord.pitches}
+    if not chord_pcs:
         return None
-    pitch_classes = {p.pitchClass for p in pitches}
-    best_degree = None
-    best_overlap = 0
+    if not chord_pcs.issubset(scale_pcs):
+        return None
     for degree, triad_pcs in triads.items():
-        overlap = len(pitch_classes & triad_pcs)
-        if overlap > best_overlap:
-            best_overlap = overlap
-            best_degree = degree
-    if best_overlap == 0:
-        return None
-    return best_degree
+        if triad_pcs.issubset(chord_pcs):
+            return degree
+    return None
+
+
+def collect_measure_degrees(
+    score: stream.Score,
+    triads: dict[int, set[int]],
+    scale_pcs: set[int],
+) -> dict[int, int | None]:
+    measure_degrees: dict[int, int | None] = {}
+    chordified = score.chordify()
+    for meas in chordified.getElementsByClass(stream.Measure):
+        num = meas.number
+        if num is None:
+            continue
+        degree = None
+        for chord in meas.recurse().getElementsByClass(m21chord.Chord):
+            mapped = chord_to_degree(chord, triads, scale_pcs)
+            if mapped is not None:
+                degree = mapped
+                break
+        measure_degrees[num] = degree
+    return measure_degrees
 
 
 def degree_to_roman_and_function(degree: int, mode: str) -> tuple[str, str] | None:
@@ -97,28 +104,22 @@ def extract_progressions(score: stream.Score, source: Path) -> list[dict]:
     key_obj = analyze_key(score)
     mode = key_obj.mode
     triads = build_diatonic_triads(key_obj)
-
-    measures = collect_measure_pitches(score)
-    ordered_measures = sorted(measures.keys())
-
-
-
-    degrees_by_measure: list[tuple[int, int]] = []
-    for num in ordered_measures:
-        degree = measure_to_degree(measures[num], triads)
-        if degree is not None:
-            degrees_by_measure.append((num, degree))
+    scale_pcs = build_scale_pitch_classes(key_obj)
+    measure_degrees = collect_measure_degrees(score, triads, scale_pcs)
+    ordered_measures = sorted(measure_degrees.keys())
 
     progressions: list[dict] = []
-    for idx in range(len(degrees_by_measure) - 3):
-        window = degrees_by_measure[idx:idx + 4]
-        measure_numbers = [m for m, _ in window]
+    for idx in range(len(ordered_measures) - 3):
+        measure_numbers = ordered_measures[idx:idx + 4]
         if measure_numbers != list(range(measure_numbers[0], measure_numbers[0] + 4)):
+            continue
+        degrees = [measure_degrees[num] for num in measure_numbers]
+        if any(degree is None for degree in degrees):
             continue
         roman_seq = []
         function_seq = []
         valid = True
-        for _, degree in window:
+        for degree in degrees:
             mapped = degree_to_roman_and_function(degree, mode)
             if not mapped:
                 valid = False
@@ -333,7 +334,7 @@ def update_progression_weights(records: list[dict]) -> list[dict]:
     for item in records:
         seq = tuple(item.get("roman_sequence", []))
         count = counts.get(seq, 0)
-        item["weight"] = round(count / max_count, 2)
+        item["weight"] = round(count / max_count, 4)
     return records
 
 
@@ -372,7 +373,7 @@ def build_progression_pattern_summary(records: list[dict]) -> list[dict]:
             "mode": mode,
             "function_sequence": list(function_seq),
             "count": count,
-            "base_weight": round(count / max_count, 2),
+            "base_weight": round(count / max_count, 4),
             "emotion_scores": averaged_emotions,
         })
     return summary
