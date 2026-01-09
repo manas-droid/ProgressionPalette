@@ -347,25 +347,33 @@ def update_weights_file(path: Path) -> None:
 
 def build_progression_pattern_summary(records: list[dict]) -> list[dict]:
     counts: dict[tuple[str, str, tuple[str, ...]], int] = {}
-    functions_by_key: dict[tuple[str, str, tuple[str, ...]], list[str]] = {}
+    emotion_sums: dict[tuple[str, str, tuple[str, ...]], dict[str, float]] = {}
     for item in records:
         roman_seq = tuple(item.get("roman_sequence", []))
         function_seq = item.get("function_sequence", [])
         mode = item.get("mode", "")
         key = (mode, roman_seq, tuple(function_seq))
         counts[key] = counts.get(key, 0) + 1
-        if key not in functions_by_key:
-            functions_by_key[key] = function_seq
+        emotion_scores = item.get("emotion_scores", {})
+        if key not in emotion_sums:
+            emotion_sums[key] = {k: 0.0 for k in emotion_scores}
+        for emotion_id, score in emotion_scores.items():
+            emotion_sums[key][emotion_id] = emotion_sums[key].get(emotion_id, 0.0) + float(score)
 
     max_count = max(counts.values()) if counts else 1
     summary: list[dict] = []
     for (mode, roman_seq, function_seq), count in counts.items():
+        averaged_emotions: dict[str, float] = {}
+        sums = emotion_sums.get((mode, roman_seq, function_seq), {})
+        for emotion_id, total in sums.items():
+            averaged_emotions[emotion_id] = round(total / count, 4)
         summary.append({
             "roman_sequence": list(roman_seq),
             "mode": mode,
             "function_sequence": list(function_seq),
             "count": count,
             "base_weight": round(count / max_count, 2),
+            "emotion_scores": averaged_emotions,
         })
     return summary
 
