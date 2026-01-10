@@ -1,3 +1,4 @@
 all-musicxml
 **.json
 **.mid
+__pycache__
