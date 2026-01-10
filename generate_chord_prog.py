@@ -5,7 +5,7 @@ import random
 from pathlib import Path
 from music21 import key as m21key, roman, stream, tempo, meter, instrument
 import subprocess
-
+from nlp.matcher import prompt_to_emotion_bias
 emotion = input("Enter the emotion: ")
 
 @dataclass(frozen=True)
@@ -101,14 +101,8 @@ with open('key_profile.json', mode='r') as file:
 
 
 
-if not prompt_presets.get(emotion):
-    emotion = 'neutral'
 
-
-
-
-prompt_emotion_bias:EmotionScore = prompt_presets.get(emotion)
-
+prompt_emotion_bias , _ = prompt_to_emotion_bias(emotion)
 
 
 weights , positive_weighted_pattern = get_effective_weights(progression_pattern_summary, prompt_emotion_bias)
