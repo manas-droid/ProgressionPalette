@@ -1,70 +1,49 @@
-from dataclasses import dataclass
 import json
-from typing import Literal, TypedDict
 import random
-from pathlib import Path
-from music21 import key as m21key, roman, stream, tempo, meter, instrument
 import subprocess
+from pathlib import Path
+
+from music21 import instrument, key as m21key, meter, roman, stream, tempo
+
+from chord_generation_model import EmotionScore, KeyProfile, ProgressionSummary
 from nlp.matcher import prompt_to_emotion_bias
-emotion = input("Enter the emotion: ")
+from section_chord_prog_gen import get_all_section_progression
 
-@dataclass(frozen=True)
-class EmotionScore(TypedDict):
-    suspenseful_tense: float
-    calm_meditative: float
-    wistful_longing: float
-    motivational_triumphant: float
-    nostalgic_sentimental: float
-    dark_brooding: float
-    happy_uplifting: float
+FLUIDSYNTH_PATH = "/usr/bin/fluidsynth"
+SOUNDFONT_PATH = "/usr/share/sounds/sf2/default-GM.sf2"
+DEFAULT_BPM = 150  # keep fixed in 70–80 range
 
 
-@dataclass(frozen=True)
-class ProgressionSummary(TypedDict):
-    roman_sequence:list[str]
-    mode: Literal['minor', 'major']
-    function_sequence: list[str]
-    count : int
-    base_weight: float
-    emotion_scores: EmotionScore
+def get_effective_weights(
+    progression_pattern_summary: list[ProgressionSummary],
+    prompt_emotion_bias: EmotionScore,
+) -> tuple[list[float], list[ProgressionSummary]]:
+    weights: list[float] = []
+    candidates: list[ProgressionSummary] = []
 
-
-@dataclass(frozen=True)
-class KeyProfile(TypedDict):
-    key_id:str
-    tonic:str
-    mode:Literal['major', 'minor']
-    display_name:str
-    weight : float
-
-def get_effective_weights(progression_pattern_summary: list[ProgressionSummary] , prompt_emotion_bias: EmotionScore)->tuple[list[float], list[ProgressionSummary]]:
-    result:list[float] = []
-    positive_weighted_pattern:list[ProgressionSummary] = []
     for pattern in progression_pattern_summary:
-        pattern_emotion_score = pattern['emotion_scores']
-        emotion_score:float = 0.0
-        
-        for k in pattern_emotion_score.keys():
-            if prompt_emotion_bias.get(k):
-                emotion_score += (prompt_emotion_bias.get(k) * pattern_emotion_score.get(k))
-        
-        motion_penalty: float = len(set(pattern['roman_sequence'])) / len(pattern['roman_sequence'])
+        pattern_emotion_score = pattern["emotion_scores"]
+        emotion_score = 0.0
+        for emotion_id in pattern_emotion_score.keys():
+            emotion_score += (
+                prompt_emotion_bias.get(emotion_id, 0.0) * pattern_emotion_score.get(emotion_id, 0.0)
+            )
 
-        effective_weight:float = emotion_score * pattern['base_weight'] * motion_penalty
-
+        motion_penalty = len(set(pattern["roman_sequence"])) / len(pattern["roman_sequence"])
+        effective_weight = emotion_score * pattern["base_weight"] * motion_penalty
         if effective_weight > 0:
-            result.append(effective_weight)
-            positive_weighted_pattern.append(pattern)
+            weights.append(effective_weight)
+            candidates.append(pattern)
 
-    return result , positive_weighted_pattern
+    return weights, candidates
 
 
 def build_midi_progression(
     roman_sequence: list[str],
     key_choice: KeyProfile,
     output_path: Path,
-    bpm: int = 75,
-) -> stream.Score:
+    bpm: int = DEFAULT_BPM,
+) -> None:
     key_signature = m21key.Key(key_choice["tonic"], key_choice["mode"])
     part = stream.Part()
     part.append(instrument.Piano())
@@ -78,61 +57,80 @@ def build_midi_progression(
         rn.writeAsChord = True
         for p in rn.pitches:
             p.octave = 4
-
         part.append(rn)
 
     score = stream.Score()
     score.append(part)
     score.write("midi", fp=str(output_path))
-    return score
 
 
+def play_midi_file(midi_path: Path) -> None:
+    try:
+        subprocess.run(
+            [FLUIDSYNTH_PATH, "-ni", SOUNDFONT_PATH, str(midi_path)],
+            check=False,
+        )
+    except FileNotFoundError:
+        print(f"Cannot run fluidsynth at {FLUIDSYNTH_PATH}; MIDI saved at {midi_path}.")
 
 
-with open('prompt_presets.json', mode='r') as file:
-    prompt_presets = json.load(file)
-
-with open('progression_pattern_summary.json', mode='r') as file:
-    progression_pattern_summary:list[ProgressionSummary]= json.load(file)
-
-
-with open('key_profile.json', mode='r') as file:
-    key_profile: list[KeyProfile] = json.load(file)
+def load_data() -> tuple[list[ProgressionSummary], list[KeyProfile]]:
+    with open("progression_pattern_summary.json", mode="r", encoding="utf-8") as file:
+        progression_pattern_summary: list[ProgressionSummary] = json.load(file)
+    with open("key_profile.json", mode="r", encoding="utf-8") as file:
+        key_profile: list[KeyProfile] = json.load(file)
+    return progression_pattern_summary, key_profile
 
 
+def choose_key(
+    mode: str,
+    key_profile: list[KeyProfile],
+) -> KeyProfile:
+    filtered_key_profile = [key for key in key_profile if key["mode"] == mode]
+    return random.choices(
+        filtered_key_profile,
+        weights=[key["weight"] for key in filtered_key_profile],
+        k=1,
+    )[0]
 
 
-prompt_emotion_bias , _ = prompt_to_emotion_bias(emotion)
+def run_once(
+    prompt: str,
+    progression_pattern_summary: list[ProgressionSummary],
+    key_profile: list[KeyProfile],
+    midi_path: Path,
+) -> None:
+    prompt_emotion_bias, debug_info = prompt_to_emotion_bias(prompt)
+    weights, candidates = get_effective_weights(progression_pattern_summary, prompt_emotion_bias)
+
+    if not weights or sum(weights) == 0:
+        print("------- no strong matches; using fallback weights -------")
+        candidates = progression_pattern_summary
+        weights = [p["base_weight"] for p in progression_pattern_summary]
+
+    chosen_pattern: ProgressionSummary = random.choices(candidates, weights, k=1)[0]
+    key_choice = choose_key(chosen_pattern["mode"], key_profile)
+
+    final_chord_progression = get_all_section_progression(prompt_emotion_bias, progression_pattern_summary)
+
+    build_midi_progression(final_chord_progression, key_choice, midi_path, bpm=DEFAULT_BPM)
+    print(f"Wrote MIDI to {midi_path}")
+    play_midi_file(midi_path)
 
 
-weights , positive_weighted_pattern = get_effective_weights(progression_pattern_summary, prompt_emotion_bias)
+def main() -> None:
+    progression_pattern_summary, key_profile = load_data()
+    midi_path = Path("generated_progression.mid")
 
-if not weights or sum(weights) == 0:
-    print("  ------- effective weight overall is zero, therefore implementing fallback ------- ")
-    weights = [p['base_weight'] for p in progression_pattern_summary]
-    positive_weighted_pattern = progression_pattern_summary
-
-
-choose_pattern : ProgressionSummary = random.choices(positive_weighted_pattern, weights, k=1)[0]
-
-
-
-
-mode = choose_pattern['mode']
-
-filtered_key_profile = [key for key in key_profile if key['mode'] == mode]
+    print("Enter an emotion prompt (or 'q' to quit).")
+    while True:
+        prompt = input("Emotion prompt> ").strip()
+        if prompt.lower() in {"q", "quit", "exit"}:
+            break
+        if not prompt:
+            continue
+        run_once(prompt, progression_pattern_summary, key_profile, midi_path)
 
 
-key_choice = random.choices(filtered_key_profile, weights=[key['weight'] for key in filtered_key_profile] , k = 1)[0]
-
-
-
-output_path = Path("generated_progression.mid")
-
-score = build_midi_progression(choose_pattern["roman_sequence"], key_choice, output_path, bpm=150)
-
-print(f"Wrote MIDI to {output_path}")
-subprocess.run(
-    ["/usr/bin/fluidsynth", "-ni", "/usr/share/sounds/sf2/default-GM.sf2", str(output_path)],
-    check=False,
-)
+if __name__ == "__main__":
+    main()
