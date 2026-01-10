@@ -110,8 +110,9 @@ def run_once(
 
     chosen_pattern: ProgressionSummary = random.choices(candidates, weights, k=1)[0]
     key_choice = choose_key(chosen_pattern["mode"], key_profile)
+    mode_filtered_chord_progression_pattern = [pattern for pattern in progression_pattern_summary if pattern["mode"] == chosen_pattern["mode"]]
 
-    final_chord_progression = get_all_section_progression(prompt_emotion_bias, progression_pattern_summary)
+    final_chord_progression = get_all_section_progression(prompt_emotion_bias, mode_filtered_chord_progression_pattern)
 
     build_midi_progression(final_chord_progression, key_choice, midi_path, bpm=DEFAULT_BPM)
     print(f"Wrote MIDI to {midi_path}")
