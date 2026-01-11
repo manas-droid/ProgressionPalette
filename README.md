@@ -1,267 +1,196 @@
-# AI-Assisted Chord Progression Generation (v1)
+# Emotion-Aware Chord Progression Generation
 
-## Version
+## Overview
 
-**v1.0 - Harmonic Core (Frozen)**
+This project explores the intersection of **AI and music theory** by building a system that generates **emotion-conditioned chord progressions** using symbolic music representations.
 
-This document defines the **final, frozen scope of Version 1** of the project.
-All future work must build **on top of v1** without modifying its assumptions, data, or logic.
+Rather than treating music generation as a black-box sequence problem, the system emphasizes:
 
----
+* interpretable harmonic structure
+* explicit emotion modeling
+* modular, versioned evolution
+* clear separation between *generation*, *structure*, and *playback*
 
-## Project Overview
-
-This project explores the intersection of **AI and music theory** by generating **harmonically valid chord progressions** from **high-level emotional intent**.
-
-Rather than composing full songs, melodies, or audio productions, the system focuses on a **narrow but musically meaningful task**:
-
-> Translating abstract emotional intent into short, structured harmonic ideas grounded in real musical data.
-
-The system is designed as an **assistive creativity tool**, not an autonomous composer.
+The goal is to demonstrate how AI can **assist musical creativity** by producing harmonically meaningful, emotionally guided progressions that musicians can build upon.
 
 ---
 
-## Problem Statement (v1)
+## Core Capabilities
 
-Given a simple emotional prompt (e.g., *“soothing”*, *“sad”*, *“tense”*), generate a **harmonically coherent 4-bar chord progression** that:
+At its core, the system:
 
-* Is musically valid within tonal harmony
-* Reflects the requested emotional intent
-* Is drawn from real musical practice
-* Produces **different valid outputs** for the same prompt across runs
+* accepts a **high-level emotional intent** (e.g., *calm*, *hopeful*, *tense*)
+* maps it into a structured **emotion bias space**
+* samples from a dataset of extracted chord progressions
+* renders the result as **playable MIDI output**
 
-The system explicitly models **local harmonic intent**, not full song-level emotional narratives.
-
----
-
-## Core Design Principles
-
-### 1. Symbolic, Theory-Driven Generation
-
-All generation is performed using **symbolic representations**:
-
-* Roman numerals
-* Harmonic functions (Tonic / Predominant / Dominant)
-* Keys and modes (major / minor)
-
-No audio, melody, rhythm, or production features are used for decision-making.
+All musical decisions are grounded in **explicit rules and data**, not opaque models.
 
 ---
 
-### 2. Data-Grounded Harmony
+## Implemented Features (by Version)
 
-Chord progressions are derived from a **real musical corpus** (MusicXML lead-sheet style data), not invented arbitrarily.
+### v1 - Emotion-Conditioned Chord Progression Generation (Frozen)
 
-Harmonic structure is treated as:
+**What it does**
 
-* finite
-* enumerable
-* statistically describable
+* Generates a **single 4-bar chord progression**
+* Uses Roman numeral harmony and functional labels (T / PD / D)
+* Samples from a curated dataset of real music
+* Conditions generation on an emotion bias vector
 
----
+**Key ideas**
 
-### 3. Emotion as Compatibility, Not Truth
-
-Emotions are modeled as **compatibility biases** over harmonic structure, not as objective or universal labels.
-
-The system does **not** claim:
-
-* emotional correctness
-* listener perception accuracy
-* psychological grounding
+* No black-box ML
+* Fully explainable weighting and sampling
+* Deterministic structure with stochastic variety
 
 ---
 
-### 4. Controlled Diversity
+### v2.1 - Safe Natural Language Prompt Interpretation (Frozen)
 
-The system produces variation through **probabilistic sampling**, not deterministic selection.
+**What it does**
 
-Higher-probability patterns appear more often, but lower-probability patterns remain possible.
+* Converts short natural language prompts into emotion bias vectors
+* Uses a phrase-based lexicon with intensity modifiers (e.g., *very*, *slightly*)
+* Avoids embeddings or large language models
 
----
+**Why it matters**
 
-## Dataset (v1)
-
-### Source
-
-* 205 MusicXML songs
-* Lead-sheet-style harmony
-* Global key and mode per song
-
-### Extraction Rules
-
-* 4 bars per progression
-* Exactly 1 chord per bar
-* Global key and mode inherited from song
-* Only **diatonic** chords considered
-* If a bar contains multiple chords, the **first diatonic chord** is selected
-* Chord extensions, suspensions, and added tones are stripped
-* Only basic triads (major, minor, diminished) are retained
-* Non-diatonic bars invalidate the 4-bar window
-
-### Dataset Size
-
-* 1056 extracted progressions (non-unique)
-* Deduplicated into a **progression pattern catalog**
-* Each pattern assigned a frequency-derived base weight
+* Keeps interpretation transparent
+* Prevents hallucinated semantics
+* Provides a clean interface between language and music
 
 ---
 
-## Data Representation
+### v2.5 - Section-Aware Harmonic Generation (Frozen)
 
-### Progression Pattern (Conceptual)
+**What it does**
 
-* Roman numeral sequence (length = 4)
-* Harmonic function sequence
-* Mode (major / minor)
-* Empirical base weight
-* Emotion compatibility scores
-* Source provenance (song + measure index)
+* Extends generation from one 4-bar progression to **structured sections**
+* Supports:
 
-### Key Profile
+  * Intro
+  * Verse
+  * Chorus
+* All sections share a **global key and mode**, chosen once from the initial emotion
 
-* Tonic
-* Mode
-* Sampling weight (bias toward common keys)
+**How it works**
 
----
+* Each section applies:
 
-## Emotion Modeling (v1)
+  * small emotion bias adjustments
+  * harmonic constraints (motion, cadence, dominant usage)
+* Sections are generated independently but stitched coherently
 
-### Emotion Space (Fixed)
+**What it is not**
 
-* suspenseful_tense
-* calm_meditative
-* wistful_longing
-* motivational_triumphant
-* nostalgic_sentimental
-* dark_brooding
-* happy_uplifting
-
-### Emotion Scores
-
-Each progression pattern is assigned **heuristic compatibility scores** based on:
-
-* tonic / predominant / dominant balance
-* cadence strength
-* mode
-* diminished harmony presence
-
-These scores are **precomputed** and stored with the dataset.
+* Not full song composition
+* No melody, rhythm, or modulation
+* No user-defined emotional arcs
 
 ---
 
-## Prompt Handling (v1)
+### v2.3 - Harmonic Decoration at Playback Time (Frozen)
 
-User input is mapped to emotion biases using **predefined prompt presets**.
+**What it does**
 
-Example:
+* Improves **audible richness** without changing harmonic structure
+* Applies light, probabilistic decoration at playback time:
 
-```
-"soothing" : calm_meditative , nostalgic_sentimental
-```
+  * sevenths
+  * inversions
+  * octave doubling
+  * optional arpeggiation
 
-This layer is intentionally simple and exists to validate the core generation pipeline.
-It is designed to be replaced by more flexible natural-language interpretation in future versions.
+**Design rule**
 
----
+* Decoration never affects:
 
-## Generation Pipeline (v1)
+  * progression selection
+  * emotion scoring
+  * section structure
 
-1. **Prompt -> Emotion Bias Vector**
-2. **Pattern Filtering** (by mode)
-3. **Effective Weight Computation**
-
-   ```
-   effective_weight =
-       base_weight
-     × emotion_compatibility
-     × motion_penalty
-   ```
-4. **Weighted Sampling** of one progression pattern
-5. **Key Sampling** from key profile
-6. **Roman → Chord Realization**
-7. **Playback as Block-Chord MIDI**
+This layer exists purely to make output **sound more musical**, not to change decisions.
 
 ---
 
-## Output Specification
+## Experimental / Advanced Features
 
-### Symbolic Output
+### Emotion-Aware Harmonic Decoration (Experimental, v3+)
 
-* Selected key
-* 4-bar chord progression
-* One chord per bar
+An experimental extension conditions chord **color and extensions** on higher-level emotional axes such as:
 
-Example:
+* tension
+* warmth
+* lift
 
-```
-Key: C minor
-Progression:
-1 | Cm
-2 | Cm
-3 | Fm
-4 | Cm
-```
+This enables:
 
-### Audio Output
+* richer dominant alterations
+* emotion-sensitive harmonic color
+* expressive variation without changing function
 
-* MIDI file
-* Fixed tempo
-* Piano instrument
-* Block triads (no inversions, no rhythm modeling)
-
-Audio playback is for **demonstration only**.
+This feature is **intentionally excluded from frozen v2.3** and reserved for future versions.
 
 ---
 
-## What v1 Explicitly Does NOT Do
+## Output
 
-* No melody generation
-* No rhythm or groove modeling
-* No modulation detection
-* No chord extensions in structure
-* No neural harmony generation
-* No emotional classification of audio
-* No song-level form modeling
+The system produces:
 
-These are **intentional exclusions**, not limitations.
+* **Symbolic output**
 
----
+  * Roman numeral sequences
+  * Section labels
+* **Playable audio**
 
-## Status: Version Frozen
+  * MIDI files
+  * Rendered via software synthesis (e.g., FluidSynth)
 
-Version 1 is **complete and frozen**.
-
-* Dataset locked
-* Extraction rules locked
-* Generation logic locked
-* Playback scope locked
-
-All future work must be implemented as **additive extensions** that do not modify v1 behavior.
+The output is intended as a **harmonic sketch**, not a finished composition.
 
 ---
 
-## Looking Ahead
+## Design Philosophy
 
-Future versions may introduce:
+Key principles guiding the project:
 
-* Natural language prompt interpretation
-* Harmonic decoration at playback time
-* Explainability (“why this progression?”)
-* Multi-section progression chaining
+* **Explainability over opacity**
+* **Music theory as structure, not decoration**
+* **Incremental, versioned evolution**
+* **Separation of concerns**
 
-These extensions will preserve the **v1 harmonic core**.
+  * emotion → harmony → structure → sound
+
+Each version introduces *one meaningful idea* and freezes it before moving on.
 
 ---
 
-## Final Note
+## Future Work
 
-Version 1 demonstrates that **emotion-conditioned harmonic generation** can be achieved through:
+Planned or potential extensions include:
 
-* careful abstraction
-* music-theory grounding
-* real musical data
-* probabilistic reasoning
+* User-directed emotional arcs per section
+* Key modulation and modal mixture
+* Emotion-aware harmonic decoration (formalized)
+* Melody-conditioned harmony
+* More expressive rhythmic realization
+* Embedding-based or LLM-assisted prompt interpretation
+* Interactive or adaptive generation workflows
+
+All future work will preserve the frozen behavior of earlier versions.
+
+---
+
+## Summary
+
+This project demonstrates that **emotion-guided musical structure** can be modeled using:
+
+* interpretable representations
+* data-derived harmonic patterns
+* lightweight probabilistic reasoning
 
 without relying on black-box generative models.
+
+The system is designed to **complement human creativity**, not replace it.
