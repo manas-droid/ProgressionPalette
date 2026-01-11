@@ -233,8 +233,9 @@ def get_all_section_progression(prompt_emotion_bias, progression_pattern_summary
         chord_prog_with_extensions , chord_prog =  get_chord_prog(section_attributes,prompt_emotion_bias, progression_pattern_summary, previous_chord_prog)
         previous_chord_prog = chord_prog
         sections_chord_prog.extend(chord_prog_with_extensions)
+        print("section: ", _)
+        print("chord progression: ", chord_prog_with_extensions)
 
 
-    print(sections_chord_prog)
 
     return sections_chord_prog
